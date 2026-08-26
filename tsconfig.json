@@ -19,7 +19,6 @@
     "extensions/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "extensions/**/*.test.ts"
+    "node_modules"
   ]
 }

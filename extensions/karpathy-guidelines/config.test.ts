@@ -3,7 +3,7 @@ import { after, describe, it } from "node:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG, effectiveThresholds, loadConfig, saveConfig } from "./config.ts";
+import { DEFAULT_CONFIG, effectiveThresholds, loadConfig, saveConfig } from "./config.js";
 
 const tmp = mkdtempSync(join(tmpdir(), "karpathy-test-"));
 process.env.KARPATHY_CONFIG = join(tmp, "karpathy.json");

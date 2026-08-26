@@ -9,7 +9,6 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { estimateChangeSize, detectNewAbstractions, mergeEdits } from "./analysis.js";
-import type { EditEntry } from "./analysis.js";
 import type { KarpathyConfig } from "./config.js";
 import { effectiveThresholds } from "./config.js";
 import { PRINCIPLES } from "./guidelines.js";
@@ -116,7 +115,7 @@ function reviewRecentChanges(
 				reports.push({ path, tool: "write", size, abs });
 			} else {
 				// 一次 edit 调用可以带多处替换；合起来统计总规模。
-				const merged = mergeEdits(b.input.edits as EditEntry[] | undefined);
+				const merged = mergeEdits(b.input.edits);
 				const size = estimateChangeSize(merged);
 				const abs = detectNewAbstractions(merged.newText);
 				reports.push({ path, tool: "edit", size, abs });

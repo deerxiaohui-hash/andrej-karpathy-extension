@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { countLines, estimateChangeSize, detectNewAbstractions, mergeEdits } from "./analysis.ts";
+import { countLines, estimateChangeSize, detectNewAbstractions, mergeEdits } from "./analysis.js";
 
 describe("countLines", () => {
 	it("对 undefined 返回 0", () => {

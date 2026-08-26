@@ -21,9 +21,11 @@ export function registerToolGuard(pi: ExtensionAPI, config: KarpathyConfig): voi
 		// 内置的 write 和 edit 工具走同一条路径。
 		if (event.toolName === "write") {
 			if (!isToolCallEventType("write", event)) return;
-			const size = estimateChangeSize({ content: event.input.content as string | undefined });
+			// 不加 as 断言：这里的 event.input 已经是 WriteToolInput，pi 改字段名时
+			// tsc 会直接报错，而不是默默拿到 undefined 后静默失效。
+			const size = estimateChangeSize({ content: event.input.content });
 			if (size.totalLines <= maxLines) return;
-			return await confirmBroadChange(ctx, "write", event.input.path as string, size, maxLines);
+			return await confirmBroadChange(ctx, "write", event.input.path, size, maxLines);
 		}
 
 		if (event.toolName === "edit") {

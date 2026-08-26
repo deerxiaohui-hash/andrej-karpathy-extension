@@ -43,22 +43,24 @@ export function estimateChangeSize(args: { content?: string; newText?: string; o
 	return { addedLines: added, removedLines: removed, totalLines: added + removed };
 }
 
-/** edit 工具的入参形状：一次调用可以携带多处替换。 */
-export interface EditEntry {
-	oldText?: string;
-	newText?: string;
-}
-
 /**
  * 把一次 edit 调用的多处替换各自拼成一个字符串，交给
  * estimateChangeSize / detectNewAbstractions 复用。用 "\n" 连接：
  * countLines 对拼接结果的计数正好等于各段之和。
+ *
+ * 参数收 unknown 而不是具体形状：tool_result 事件和 session entry 里的
+ * input 都是 Record<string, unknown>，调用点拿不到类型。形状不对时按空处理，
+ * 不抛错——统计失准也好过打断工具调用。
  */
-export function mergeEdits(edits: EditEntry[] | undefined): { oldText: string; newText: string } {
-	const list = edits ?? [];
+export function mergeEdits(edits: unknown): { oldText: string; newText: string } {
+	const list = Array.isArray(edits) ? edits : [];
+	const pick = (entry: unknown, key: "oldText" | "newText"): string => {
+		const value = (entry as Record<string, unknown> | null | undefined)?.[key];
+		return typeof value === "string" ? value : "";
+	};
 	return {
-		oldText: list.map((e) => e.oldText ?? "").join("\n"),
-		newText: list.map((e) => e.newText ?? "").join("\n"),
+		oldText: list.map((e) => pick(e, "oldText")).join("\n"),
+		newText: list.map((e) => pick(e, "newText")).join("\n"),
 	};
 }
 

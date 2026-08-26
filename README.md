@@ -79,10 +79,18 @@ dsh plugin add npm:andrej-karpathy-extension
 
 ```bash
 npm install
-npm test           # analysis + config 辅助函数的单元测试
-npx tsc --noEmit   # 类型检查
+npm test           # 53 个测试：纯函数 + 五个机制的 handler 行为
+npx tsc --noEmit   # 类型检查（含测试文件）
 npx pi2dsh inspect npm:andrej-karpathy-extension@latest  # 兼容性检查
 ```
+
+测试不需要真的跑起 pi：[test-harness.ts](extensions/karpathy-guidelines/test-harness.ts)
+提供假的 `ExtensionAPI` / `ExtensionContext`，直接把事件喂给 handler，因此
+确认框的两个答复、非交互降级、基线快照这些分支都能覆盖。
+
+事件负载刻意用 pi 导出的 `WriteToolInput` / `EditToolInput` 标注：pi 哪天改了
+工具入参的形状，`tsc` 会直接报错，而不是让守卫默默失效。（这不是假设——
+`edit` 的入参是 `edits: {oldText, newText}[]` 而非平铺字段，最初就踩过一次。）
 
 ## 许可证
 

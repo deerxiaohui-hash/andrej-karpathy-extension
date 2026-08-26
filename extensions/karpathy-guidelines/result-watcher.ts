@@ -19,7 +19,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { detectNewAbstractions, mergeEdits } from "./analysis.js";
-import type { EditEntry, NewAbstraction } from "./analysis.js";
+import type { NewAbstraction } from "./analysis.js";
 import type { KarpathyConfig } from "./config.js";
 import { effectiveThresholds } from "./config.js";
 
@@ -71,9 +71,7 @@ export function registerResultWatcher(pi: ExtensionAPI, config: KarpathyConfig):
 
 		// write 的 content 是整份文件；edit 的 edits[].newText 只是被替换进去的片段。
 		const content =
-			event.toolName === "write"
-				? asString(input.content)
-				: mergeEdits(input.edits as EditEntry[] | undefined).newText;
+			event.toolName === "write" ? asString(input.content) : mergeEdits(input.edits).newText;
 		if (!content) return;
 
 		// edit 没有基线（undefined），此时 newText 里的每个声明都算新增。

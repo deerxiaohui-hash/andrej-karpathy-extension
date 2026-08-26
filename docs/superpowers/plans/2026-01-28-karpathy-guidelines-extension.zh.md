@@ -1512,7 +1512,15 @@ pi -e ./extensions/karpathy-guidelines/index.ts
 
 - [ ] **第 4 步：验证 self_check 工具出现**
 
-以交互模式运行 `pi` 并加载 extension，然后在编辑器里输入 `/tools`，确认 `self_check` 在列表中。
+pi 没有 `/tools` 这个内置命令（内置命令里只有 settings / model / tree / reload / quit 等）。用下面两种方式之一：
+
+```bash
+# a) 看工具是否注册并启用（TUI，Tab 切 global/project 作用域）
+pi config -a
+
+# b) 直接验证它能被调用（更强的证据，不需要 TUI）
+pi -e ./extensions/karpathy-guidelines/index.ts -nbt -t self_check -p "Call the self_check tool once with goal='...' and plan='...'"
+```
 
 - [ ] **第 5 步：用一次过大的 write 触发 tool guard**
 
@@ -1715,7 +1723,7 @@ pi -e ./extensions/karpathy-guidelines/index.ts
 
 - [ ] **第 5 步：在几次 write 之后运行 `/karma review`，确认报告能渲染**
 
-- [ ] **第 6 步：确认 `self_check` 出现在 `/tools` 中**
+- [ ] **第 6 步：确认 `self_check` 已注册**（`pi config -a`，或用 `-t self_check` 跑一次实际调用；没有 `/tools` 命令）
 
 - [ ] **第 7 步：提交任何最终修复**
 
