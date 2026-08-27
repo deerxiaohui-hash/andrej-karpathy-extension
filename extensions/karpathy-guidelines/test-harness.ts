@@ -16,6 +16,13 @@ export interface Notice {
 	level?: string;
 }
 
+/** ctx.ui.setWidget 收到的一次调用。 */
+export interface WidgetCall {
+	key: string;
+	content: string[];
+	options?: { placement?: string };
+}
+
 export interface FakeCtxOptions {
 	/** 只有交互模式下 tool guard 才会弹确认框。默认 false。 */
 	hasUI?: boolean;
@@ -23,13 +30,17 @@ export interface FakeCtxOptions {
 	confirmAnswer?: boolean;
 	/** ctx.sessionManager.getEntries() 的返回值，/karma review 会读它。 */
 	entries?: unknown[];
+	/** ctx.mode，默认 "tui"。非 TUI 模式欢迎消息退回 notify。 */
+	mode?: string;
 }
 
 interface FakeCtx {
 	hasUI: boolean;
+	mode: string;
 	ui: {
 		notify(message: string, level?: string): void;
 		confirm(title: string, message: string): Promise<boolean>;
+		setWidget(key: string, content: string[] | undefined, options?: { placement?: string }): void;
 	};
 	sessionManager: { getEntries(): unknown[] };
 }
@@ -42,6 +53,8 @@ export interface Harness {
 	notices: Notice[];
 	/** ctx.ui.confirm 收到的 (title, message)。 */
 	confirms: { title: string; message: string }[];
+	/** ctx.ui.setWidget 的调用记录，按顺序累积。 */
+	widgets: WidgetCall[];
 	/** 已注册的事件名，按注册顺序。 */
 	registeredEvents(): string[];
 	hasTool(name: string): boolean;
@@ -57,6 +70,7 @@ export function createHarness(): Harness {
 	const toolNames = new Set<string>();
 	const notices: Notice[] = [];
 	const confirms: { title: string; message: string }[] = [];
+	const widgets: WidgetCall[] = [];
 
 	const pi = {
 		on: (event: string, fn: Handler) => {
@@ -74,6 +88,7 @@ export function createHarness(): Harness {
 		const entries = opts.entries ?? [];
 		return {
 			hasUI: opts.hasUI ?? false,
+			mode: opts.mode ?? "tui",
 			ui: {
 				notify: (message, level) => {
 					notices.push({ message, level });
@@ -81,6 +96,9 @@ export function createHarness(): Harness {
 				confirm: async (title, message) => {
 					confirms.push({ title, message });
 					return opts.confirmAnswer ?? false;
+				},
+				setWidget: (key, content, options) => {
+					widgets.push({ key, content: content ?? [], options });
 				},
 			},
 			sessionManager: { getEntries: () => entries },
@@ -91,6 +109,7 @@ export function createHarness(): Harness {
 		pi,
 		notices,
 		confirms,
+		widgets,
 		registeredEvents: () => handlers.map((h) => h.event),
 		hasTool: (name) => toolNames.has(name),
 		fire: async (event, payload, opts) => {

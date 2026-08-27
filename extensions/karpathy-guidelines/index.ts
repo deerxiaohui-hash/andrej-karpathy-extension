@@ -27,6 +27,9 @@ import { registerCommands } from "./commands.js";
 import { registerSelfCheckTool } from "./self-check-tool.js";
 import { welcomeMessage } from "./guidelines.js";
 
+/** 常驻 widget 的 key。同一 key 重复 setWidget 会先移除旧组件再设置新的。 */
+const WIDGET_KEY = "karpathy-welcome";
+
 export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 在 Extension 加载时加载一次配置。配置对象在剩余生命周期内可变；
 	// 如果用户编辑了 JSON 文件，可以 /reload 重新加载。
@@ -48,10 +51,18 @@ export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 5. 注册 self_check 工具。
 	registerSelfCheckTool(pi);
 
-	// 一次性欢迎。session_start 带上 reason "startup" 在每个进程里只触发一次，
-	// 不是每次 session 恢复都触发。
+	// 常驻欢迎 widget。TUI 模式下把三行编辑部风欢迎语固定在输入框上方，
+	// 整个 session 期间可见；print/RPC 模式没有 widget，退回一次性 notify。
+	// "startup" 在每个进程里只触发一次；同 key 重复 setWidget 幂等，
+	// /reload 后重新注册也只会得到一个 widget。
 	pi.on("session_start", async (event, ctx) => {
 		if (event.reason !== "startup") return;
-		ctx.ui.notify(welcomeMessage(), "info");
+		if (ctx.mode === "tui") {
+			ctx.ui.setWidget(WIDGET_KEY, welcomeMessage().split("\n"), {
+				placement: "aboveEditor",
+			});
+		} else {
+			ctx.ui.notify(welcomeMessage(), "info");
+		}
 	});
 }
