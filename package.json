@@ -1,0 +1,36 @@
+{
+  "name": "andrej-karpathy-extension",
+  "version": "0.1.0",
+  "description": "pi extension that programmatically enforces Karpathy's four coding guidelines. Compatible with pi2dsh for DSH.",
+  "keywords": [
+    "pi-package",
+    "karpathy",
+    "coding-guidelines",
+    "ai-agent",
+    "pi2dsh"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "extensions/",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test extensions/karpathy-guidelines/*.test.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/karpathy-guidelines/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3"
+  }
+}
