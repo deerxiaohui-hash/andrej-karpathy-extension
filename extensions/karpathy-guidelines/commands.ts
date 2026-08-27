@@ -61,6 +61,7 @@ function showGuidelines(
 			bullet(`strictness: ${config.strictness}（有效阈值：${th.maxLines} 行，${th.maxAbs} 个新抽象）`),
 			bullet(`tool guard: ${config.enableToolGuard ? "开" : "关"}`),
 			bullet(`result watcher: ${config.enableResultWatcher ? "开" : "关"}`),
+			bullet(`impact watcher: ${config.enableImpactWatcher ? "开" : "关"}`),
 			bullet("编辑 ~/.pi/agent/karpathy.json 修改配置，然后 /reload。"),
 		].join("\n"),
 	);
@@ -79,6 +80,7 @@ function showConfig(
 		bullet(`maxNewAbstractions: ${config.maxNewAbstractions} -> 有效值 ${th.maxAbs}`),
 		bullet(`enableToolGuard: ${config.enableToolGuard}`),
 		bullet(`enableResultWatcher: ${config.enableResultWatcher}`),
+		bullet(`enableImpactWatcher: ${config.enableImpactWatcher}`),
 		bullet(`strictness: ${config.strictness}`),
 		"",
 		"编辑 ~/.pi/agent/karpathy.json 后运行 /reload。",

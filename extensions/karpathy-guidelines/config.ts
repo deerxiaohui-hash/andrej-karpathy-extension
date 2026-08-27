@@ -17,6 +17,8 @@ export interface KarpathyConfig {
 	enableToolGuard: boolean;
 	/** tool_result 监听器是否在过度工程时追加警告。 */
 	enableResultWatcher: boolean;
+	/** 是否在改动共享模块时提示波及范围并要求验证。 */
+	enableImpactWatcher: boolean;
 	/** 警告的严格程度。越高 = 越早告警。 */
 	strictness: Strictness;
 }
@@ -26,6 +28,7 @@ export const DEFAULT_CONFIG: KarpathyConfig = {
 	maxNewAbstractions: 2,
 	enableToolGuard: true,
 	enableResultWatcher: true,
+	enableImpactWatcher: true,
 	strictness: "medium",
 };
 

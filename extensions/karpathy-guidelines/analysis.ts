@@ -65,9 +65,13 @@ export function mergeEdits(edits: unknown): { oldText: string; newText: string }
 }
 
 /**
- * 在代码字符串中检测新引入的抽象。启发式检测：
+ * 在代码字符串中检测新引入的**顶层**抽象。启发式检测：
  * - TypeScript/JavaScript：函数声明、类声明、interface/type 声明
  * - Python：class/def 声明
+ *
+ * 只统计行首无缩进的声明。嵌套声明（函数内的局部函数、类方法、
+ * 内部 type）不是新引入的顶层抽象，把它们算进来只会让
+ * result-watcher 的警告噪音变大。
  *
  * 我们刻意使用简单的正则模式。允许出现误报，因为目标是
  * 提示模型去思考，而不是以 100% 的确定性阻断。
@@ -81,6 +85,8 @@ export function detectNewAbstractions(content: string | undefined): AbstractionR
 	const lines = content.split("\n");
 
 	lines.forEach((line, idx) => {
+		// 行首有空白（空格或 tab）即视为嵌套声明，跳过。
+		if (/^[ \t]/.test(line)) return;
 		const trimmed = line.trim();
 		let m: RegExpMatchArray | null;
 

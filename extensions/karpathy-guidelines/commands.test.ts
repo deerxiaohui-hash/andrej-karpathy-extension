@@ -62,6 +62,7 @@ describe("/karma", () => {
 		const text = allText(h.notices);
 		// 150 * 0.6 = 90
 		assert.match(text, /maxLinesPerEdit: 150 -> 有效值 90/);
+		assert.match(text, /enableImpactWatcher: true/);
 		assert.match(text, /karpathy\.json/);
 	});
 

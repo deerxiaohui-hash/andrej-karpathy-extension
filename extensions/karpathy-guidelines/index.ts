@@ -25,6 +25,7 @@ import { registerToolGuard } from "./tool-guard.js";
 import { registerResultWatcher } from "./result-watcher.js";
 import { registerCommands } from "./commands.js";
 import { registerSelfCheckTool } from "./self-check-tool.js";
+import { welcomeMessage } from "./guidelines.js";
 
 export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 在 Extension 加载时加载一次配置。配置对象在剩余生命周期内可变；
@@ -37,7 +38,7 @@ export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 2. 守卫过大范围的 write/edit 操作。
 	registerToolGuard(pi, configRef.current);
 
-	// 3. 当引入过多新抽象时引导模型。
+	// 3. 当引入过多新抽象时引导模型；改动被引用的模块时提醒验证依赖方。
 	registerResultWatcher(pi, configRef.current);
 
 	// 4. 注册 /karma 命令。configRef 是实时读取的，以便将来
@@ -51,9 +52,6 @@ export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 不是每次 session 恢复都触发。
 	pi.on("session_start", async (event, ctx) => {
 		if (event.reason !== "startup") return;
-		ctx.ui.notify(
-			"Karpathy 准则已激活：/karma 查看，/karma configure 查看设置。",
-			"info",
-		);
+		ctx.ui.notify(welcomeMessage(), "info");
 	});
 }

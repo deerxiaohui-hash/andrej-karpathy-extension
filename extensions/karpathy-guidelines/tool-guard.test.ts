@@ -1,8 +1,9 @@
 /**
- * tool guard 的行为测试。
+ * tool guard（观察者模式）的行为测试。
  *
- * 覆盖 `-p` 模式下看不见的那些分支：确认框的两个答复、非交互降级、
- * 以及 edit 多处替换合并后才超阈值的情况。
+ * 观察者只通知、不拦截：任何过大的 write/edit 都变成一条带数字的 warning，
+ * 工具调用永远放行，confirm 永远不被调用。误报的代价因此从"打断工作"
+ * 降为"多一条信息"。
  *
  * 事件负载用 pi 导出的 WriteToolInput / EditToolInput 标注——pi 哪天改了
  * 工具入参的形状，这里会直接编译不过，而不是默默失效。
@@ -27,70 +28,52 @@ function bigWrite(path = "src/big.ts"): { toolName: "write"; input: WriteToolInp
 	return { toolName: "write", input };
 }
 
-interface BlockResult {
-	block: true;
-	reason: string;
-}
-
-function asBlock(value: unknown): BlockResult {
-	assert.ok(
-		typeof value === "object" && value !== null && "block" in value,
-		`期望拿到阻断结果，实际是 ${JSON.stringify(value)}`,
-	);
-	return value as BlockResult;
-}
-
-describe("registerToolGuard", () => {
+describe("registerToolGuard（观察者模式）", () => {
 	it("配置关闭时一个 handler 都不注册", () => {
 		const h = setup({ enableToolGuard: false });
 		assert.deepEqual(h.registeredEvents(), []);
 	});
 
-	it("小改动放过，不弹确认框", async () => {
+	it("小改动保持沉默", async () => {
 		const h = setup();
 		const input: WriteToolInput = { path: "src/small.ts", content: lines(10) };
 		const results = await h.fire("tool_call", { toolName: "write", input }, { hasUI: true });
 		assert.deepEqual(results, []);
-		assert.equal(h.confirms.length, 0);
+		assert.equal(h.notices.length, 0);
 	});
 
-	it("过大的 write 在交互模式下弹确认框，用户拒绝则阻断", async () => {
+	it("过大的 write 只通知、不拦截，交互模式也不弹确认框", async () => {
 		const h = setup();
-		const results = await h.fire("tool_call", bigWrite(), {
-			hasUI: true,
-			confirmAnswer: false,
-		});
-		assert.equal(results.length, 1);
-		const blocked = asBlock(results[0]);
-		assert.equal(blocked.block, true);
-		assert.match(blocked.reason, /Karpathy tool guard/);
+		const results = await h.fire("tool_call", bigWrite(), { hasUI: true });
 
-		// 确认框里要说清是哪个文件、多少行、阈值多少。
-		assert.equal(h.confirms.length, 1);
-		const dialog = h.confirms[0]!;
-		assert.match(dialog.title, /Karpathy/);
-		assert.match(dialog.message, /201 行/);
-		assert.match(dialog.message, /阈值 150/);
-		assert.match(dialog.message, /src\/big\.ts/);
-	});
-
-	it("用户同意则不阻断，并留下一条确认通知", async () => {
-		const h = setup();
-		const results = await h.fire("tool_call", bigWrite(), {
-			hasUI: true,
-			confirmAnswer: true,
-		});
+		// 观察者永远放行。
 		assert.deepEqual(results, []);
-		assert.match(allText(h.notices), /ok: write/);
+		assert.equal(h.confirms.length, 0, "观察者模式不应调用 confirm");
+
+		// 但要留下带数字的通知。
+		assert.equal(h.notices.length, 1);
+		const notice = h.notices[0]!;
+		assert.equal(notice.level, "warning");
+		assert.match(notice.message, /write src\/big\.ts/);
+		assert.match(notice.message, /201 行（阈值 150）/);
+		assert.match(notice.message, /\+201\/-0/);
 	});
 
-	it("非交互模式只通知不阻断（print 模式下不能卡住 agent）", async () => {
+	it("非交互模式同样只通知", async () => {
 		const h = setup();
 		const results = await h.fire("tool_call", bigWrite(), { hasUI: false });
 		assert.deepEqual(results, []);
-		assert.equal(h.confirms.length, 0);
 		assert.equal(h.notices.length, 1);
-		assert.equal(h.notices[0]!.level, "warning");
+	});
+
+	it("纯数据内容也通知——观察者提供信号，不替人判断", async () => {
+		const h = setup();
+		// 300 行行号文件：没有抽象、没有风险，但规模依然值得看见。
+		const input: WriteToolInput = { path: "tmp/big2.txt", content: lines(300) };
+		const results = await h.fire("tool_call", { toolName: "write", input }, { hasUI: true });
+		assert.deepEqual(results, [], "数据文件也不能被拦");
+		assert.equal(h.notices.length, 1);
+		assert.match(h.notices[0]!.message, /300 行/);
 	});
 
 	it("edit 的多处替换合起来算总规模", async () => {
@@ -104,16 +87,20 @@ describe("registerToolGuard", () => {
 			],
 		};
 		const results = await h.fire("tool_call", { toolName: "edit", input }, { hasUI: true });
-		assert.equal(results.length, 1);
-		assert.equal(asBlock(results[0]).block, true);
+		assert.deepEqual(results, []);
+		assert.equal(h.notices.length, 1);
+		assert.match(h.notices[0]!.message, /edit src\/x\.ts/);
+		// 新增 200 行 + 删除 2 行 = 总规模 202。
+		assert.match(h.notices[0]!.message, /202 行/);
+		assert.match(h.notices[0]!.message, /\+200\/-2/);
 	});
 
 	it("strictness=high 会把行数阈值收紧到 90", async () => {
 		const h = setup({ strictness: "high" });
 		const input: WriteToolInput = { path: "src/mid.ts", content: lines(100) };
-		const results = await h.fire("tool_call", { toolName: "write", input }, { hasUI: true });
-		assert.equal(results.length, 1);
-		assert.match(h.confirms[0]!.message, /阈值 90/);
+		await h.fire("tool_call", { toolName: "write", input }, { hasUI: true });
+		assert.equal(h.notices.length, 1);
+		assert.match(h.notices[0]!.message, /阈值 90/);
 	});
 
 	it("不管别的工具", async () => {
@@ -124,6 +111,12 @@ describe("registerToolGuard", () => {
 			{ hasUI: true },
 		);
 		assert.deepEqual(results, []);
-		assert.equal(h.confirms.length, 0);
+		assert.equal(h.notices.length, 0);
+	});
+
+	it("通知文本汇总后能看出规模信号", async () => {
+		const h = setup();
+		await h.fire("tool_call", bigWrite(), { hasUI: true });
+		assert.match(allText(h.notices), /karpathy/);
 	});
 });

@@ -98,4 +98,40 @@ describe("detectNewAbstractions", () => {
 		const r = detectNewAbstractions("\n\nfunction baz() {}");
 		assert.equal(r.abstractions[0]!.line, 3);
 	});
+	it("忽略嵌套声明（局部函数、类方法、内部 type 不算顶层抽象）", () => {
+		const r = detectNewAbstractions(
+			[
+				"function outer() {",
+				"  function inner() {}",
+				"}",
+			"class A {",
+				"  method() {}",
+				"}",
+			"  type Nested = string;",
+			"	function tabIndented() {}",
+			].join("\n"),
+		);
+		assert.equal(r.count, 2);
+		assert.deepEqual(
+			r.abstractions.map((a) => a.name),
+			["outer", "A"],
+		);
+	});
+	it("忽略 Python 嵌套 def（缩进的方法/局部函数）", () => {
+		const r = detectNewAbstractions(
+			[
+				"class MyClass:",
+				"    def method(self):",
+				"        pass",
+				"    def helper(self):",
+				"        pass",
+			].join("\n"),
+		);
+		assert.equal(r.count, 1);
+		assert.equal(r.abstractions[0]!.name, "MyClass");
+	});
+	it("缩进代码块中的声明不计入（如 markdown 缩进式代码块）", () => {
+		const r = detectNewAbstractions("    function inIndentedBlock() {}");
+		assert.equal(r.count, 0);
+	});
 });
