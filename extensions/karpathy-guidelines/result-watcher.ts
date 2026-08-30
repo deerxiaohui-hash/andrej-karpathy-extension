@@ -2,14 +2,14 @@
  * 监控 tool_result 事件中的两类信号：
  *
  * 1. 过度工程：在 write/edit 完成后查看实际落地的内容，统计新增顶层抽象。
- *    超过阈值就通过修改 tool_result 的 content 追加一条警告，让模型在下一轮看到。
- * 2. 波及范围：被改的文件如果有其他源文件引用它，追加一条提醒，
+ *    超过阈值就在 tool_result 的 content 顶部前置一条警告，让模型在下一轮看到。
+ * 2. 波及范围：被改的文件如果有其他源文件相对导入它，前置一条提醒，
  *    要求收尾前跑类型检查和相关测试（对应准则 3 的影响声明和准则 4 的验证循环）。
  *
  * 为什么要在 tool_call 时先拍快照：`write` 的 input.content 是整份文件的
- * 新内容，直接统计会把文件里原有的函数/类也算成新增。所以写入之前先记下
- * 已有声明的签名，写入之后只对差集告警。`edit` 的 newText 只是被插入的片段，
- * 不需要基线。
+ * 新内容，直接统计会把文件里原有的函数/类也算成新增；`edit` 的 newText
+ * 也可能整体重写已有函数，声明行会原样出现在片段里。所以写入之前先记下
+ * 已有声明的签名，写入之后只对差集告警。
  *
  * 注意：不使用 pi.sendMessage()，因为 pi2dsh 不支持。
  * 改为 return 修改后的 content，这是 pi2dsh 已映射的能力。
@@ -112,25 +112,34 @@ export function findDependents(targetPath: string, root: string, maxFiles = 500)
 }
 
 function abstractionWarning(added: NewAbstraction[], maxAbs: number): string {
-	const names = added
+	const listed = added
 		.slice(0, 6)
-		.map((a) => `${a.kind} \`${a.name}\``)
-		.join(", ");
+		.map((a) => `  - ${a.kind} \`${a.name}\` (line ${a.line})`);
+	if (added.length > 6) listed.push("  - ...");
+	// 要求型文案：让模型逐条回应，而不是修辞性提问。末尾的空行是
+	// 前置后与后面真实结果之间的分隔（见 registerResultWatcher 的 content 重排）。
 	return [
+		`⚠️ [Karpathy — Simplicity First] 本次改动引入了 ${added.length} 个新的顶层抽象（阈值：${maxAbs}）：`,
+		...listed,
 		"",
-		`⚠️ [Karpathy] 你刚刚引入了 ${added.length} 个新的顶层抽象（阈值：${maxAbs}）。`,
-		`检测到：${names}${added.length > 6 ? "，..." : ""}。`,
-		`依照 Simplicity First：这些全部都是当前请求真正需要的吗？`,
-		`能否把其中某些内联、删除，或者推迟到第二个用户真正需要时再添加？`,
+		"在继续下一步之前，逐个回答：",
+		"1. 每个抽象都是当前用户请求直接需要的吗？",
+		"2. 其中某些能否内联到调用方，而不是新建顶层抽象？",
+		"3. 一个资深工程师会认为这些属于过度设计吗？",
+		"",
 	].join("\n");
 }
 
 function impactNote(path: string, deps: string[]): string {
 	const examples = deps.slice(0, 3).join("、");
 	return [
+		`⚠️ [Karpathy — Surgical Changes] \`${path}\` 被 ${deps.length} 个文件引用（如 ${examples}）。`,
 		"",
-		`⚠️ [Karpathy] \`${path}\` 被 ${deps.length} 个文件引用（如 ${examples}）。`,
-		"依照外科手术式修改与目标驱动执行：收尾前运行 `tsc --noEmit` 与依赖方相关测试，确认它们依然通过。",
+		"在继续下一步之前，确认：",
+		"1. 改动是否改变了现有导出签名（参数、返回类型、接口形状）？",
+		"2. 如果改变了，依赖方是否仍然正常工作？",
+		"3. 是否已运行 `tsc --noEmit` 与依赖方相关测试？",
+		"",
 	].join("\n");
 }
 
@@ -166,9 +175,9 @@ export function registerResultWatcher(
 	const { maxAbs } = effectiveThresholds(config);
 
 	if (watchAbs) {
-		// 写入之前：记录文件现有的声明作为基线。
+		// 写入之前：记录文件现有的声明作为基线（write 和 edit 都拍）。
 		pi.on("tool_call", async (event) => {
-			if (event.toolName !== "write") return;
+			if (event.toolName !== "write" && event.toolName !== "edit") return;
 			const path = asString(readInput(event).path);
 			if (!path) return;
 			baselines.set(path, existingSignatures(path));
@@ -189,8 +198,8 @@ export function registerResultWatcher(
 			const content =
 				event.toolName === "write" ? asString(input.content) : mergeEdits(input.edits).newText;
 			if (content) {
-				// edit 没有基线（undefined），此时 newText 里的每个声明都算新增。
-				const baseline = event.toolName === "write" ? baselines.get(path) : undefined;
+				// 快照缺失（没经过 tool_call 的旁路路径）时基线为空集，声明全算新增兜底。
+				const baseline = baselines.get(path);
 				baselines.delete(path);
 
 				const added = detectNewAbstractions(content).abstractions.filter(
@@ -210,11 +219,14 @@ export function registerResultWatcher(
 
 		if (notes.length === 0) return;
 
-		// 通过修改 tool_result content 追加警告（pi2dsh 已映射）。
+		// 警告前置而不是追加：模型逐 block 读取 content，第一眼看到的应该
+		// 是警告而不是"写入成功"。原结果跟在警告后面，保留完整上下文——
+		// 这也是不对 tool_result 做整体替换的原因（见 tmp/plan-c 文档）。
+		// 仍通过修改 content 实现（pi2dsh 已映射）。
 		return {
 			content: [
-				...(Array.isArray(event.content) ? event.content : []),
 				...notes.map((text) => ({ type: "text" as const, text })),
+				...(Array.isArray(event.content) ? event.content : []),
 			],
 		};
 	});

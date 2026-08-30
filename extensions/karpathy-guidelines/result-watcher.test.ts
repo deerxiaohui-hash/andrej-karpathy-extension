@@ -47,6 +47,25 @@ async function runWrite(h: Harness, path: string, content: string): Promise<unkn
 	});
 }
 
+/**
+ * edit 的最小真实顺序：初始内容先写上磁盘（tool_call 拍基线要读它），
+ * 然后 fire tool_call -> fire tool_result。不用真的把 edit 应用到磁盘——
+ * watcher 只读快照和 input 里的 newText。
+ */
+async function runEdit(
+	h: Harness,
+	path: string,
+	edits: { oldText: string; newText: string }[],
+): Promise<unknown[]> {
+	const input: EditToolInput = { path, edits };
+	await h.fire("tool_call", { toolName: "edit", input });
+	return await h.fire("tool_result", {
+		toolName: "edit",
+		input,
+		content: [{ type: "text", text: "ok" }],
+	});
+}
+
 function warningText(results: unknown[]): string {
 	assert.equal(results.length, 1, `期望恰好一条警告，实际 ${results.length} 条`);
 	const blocks = (results[0] as { content?: { text?: string }[] }).content ?? [];
@@ -119,16 +138,25 @@ describe("registerResultWatcher", () => {
 		assert.deepEqual(results, []);
 	});
 
-	it("警告追加在原有 content 之后，不覆盖它", async () => {
+	it("警告前置在原有 content 之前，不覆盖它", async () => {
 		const h = setup();
 		const results = await runWrite(h, freshPath(), functions([1, 2, 3]));
 		const blocks = (results[0] as { content: { type: string; text: string }[] }).content;
 		assert.equal(blocks.length, 2);
-		assert.equal(blocks[0]!.text, "ok");
-		assert.match(blocks[1]!.text, /Karpathy/);
+		assert.match(blocks[0]!.text, /Karpathy/);
+		assert.equal(blocks[1]!.text, "ok");
 	});
 
-	it("edit 按 edits[].newText 统计，且不需要基线", async () => {
+	it("警告块以空行结尾，与后面的原始结果分隔", async () => {
+		const h = setup();
+		const results = await runWrite(h, freshPath(), functions([1, 2, 3]));
+		const blocks = (results[0] as { content: { text: string }[] }).content;
+		assert.match(blocks[0]!.text, /\n$/, "警告文本应以空行结尾");
+	});
+
+	it("edit 按 edits[].newText 统计，快照缺失时兜底全算新增", async () => {
+		// 没经过 tool_call 就没有基线快照，此时 newText 里的每个声明都算
+		// 新增——宁可多提醒，也不静默漏报。正常路径见下面两个带基线的用例。
 		const h = setup();
 		const input: EditToolInput = {
 			path: freshPath(),
@@ -139,6 +167,38 @@ describe("registerResultWatcher", () => {
 		};
 		const results = await h.fire("tool_result", { toolName: "edit", input, content: [] });
 		assert.match(warningText(results), /3 个新的顶层抽象/);
+	});
+
+	it("edit 重写已有函数不误报为新增（基线快照生效）", async () => {
+		const h = setup();
+		const path = freshPath();
+		writeFileSync(path, functions([1, 2, 3, 4, 5]), "utf-8");
+
+		// newText 是整段重写的函数体：声明行原样重现，但签名和基线一致，
+		// 不算新增。这是改动一要修掉的核心误报场景。
+		const rewritten = (n: number): string => `export function fn${n}() {\n\treturn ${n * 10};\n}`;
+		const results = await runEdit(
+			h,
+			path,
+			[1, 2, 3, 4, 5].map((n) => ({ oldText: functions([n]), newText: rewritten(n) })),
+		);
+		assert.deepEqual(results, [], "重写已有函数不该产生警告");
+	});
+
+	it("edit 重写 2 个已有函数 + 真新增 3 个时，只算新增的 3 个", async () => {
+		const h = setup();
+		const path = freshPath();
+		writeFileSync(path, functions([1, 2, 3, 4, 5]), "utf-8");
+
+		const rewritten = (n: number): string => `export function fn${n}() {\n\treturn ${n * 10};\n}`;
+		const text = warningText(
+			await runEdit(h, path, [
+				{ oldText: functions([1]), newText: rewritten(1) },
+				{ oldText: functions([2]), newText: rewritten(2) },
+				{ oldText: "", newText: functions([6, 7, 8]) },
+			]),
+		);
+		assert.match(text, /3 个新的顶层抽象（阈值：2）/);
 	});
 
 	it("edits 形状不对时安静跳过，不抛错", async () => {
@@ -236,9 +296,10 @@ describe("impact watcher（波及范围）", () => {
 		const results = await runWrite(h, target, grown);
 		assert.equal(results.length, 1);
 		const blocks = (results[0] as { content: { text: string }[] }).content;
-		assert.equal(blocks.length, 3); // 原有 ok + 抽象警告 + 波及提示
-		assert.match(blocks[1]!.text, /新的顶层抽象/);
-		assert.match(blocks[2]!.text, /被 1 个文件引用/);
+		assert.equal(blocks.length, 3); // 抽象警告 + 波及提示 + 原有 ok
+		assert.match(blocks[0]!.text, /新的顶层抽象/);
+		assert.match(blocks[1]!.text, /被 1 个文件引用/);
+		assert.equal(blocks[2]!.text, "ok");
 	});
 
 	it("子目录里的依赖方也能找到", async () => {
