@@ -168,97 +168,37 @@ export function principleShorts(): string[] {
  */
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const ITALIC = "\x1b[3m";
 const APPLE_GRAY = "\x1b[38;5;240m";
-const APPLE_LIGHT = "\x1b[38;5;248m";
 const APPLE_BLUE = "\x1b[38;5;33m";
-const APPLE_WHITE = "\x1b[97m";
+const APPLE_LIGHT = "\x1b[38;5;248m";
 const APPLE_MID = "\x1b[38;5;244m";
 
 /**
- * 去掉 ANSI 转义码，得到纯文本。
- */
-function stripAnsi(s: string): string {
-	return s.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
-/**
- * 计算字符串的终端显示宽度。
- * 依据 Unicode East Asian Width 属性判定：只有“宽/全角”字符算 2，
- * 其余（含 ·、│、─、─ 等绘图字符与拉丁字母）算 1。
- * 否则像 ·（U+00B7 MIDDLE DOT）这类非 ASCII 但单宽的字符会被误判，
- * 导致边框右端对不齐。
- */
-function displayWidth(s: string): number {
-	let w = 0;
-	for (const ch of s) {
-		w += isWideChar(ch) ? 2 : 1;
-	}
-	return w;
-}
-
-/**
- * 判断单个字符是否为“宽/全角”（终端占两格）。
- * 覆盖：CJK 统一表意文字、中文标点与全角符号、日文假名、韩文等。
- */
-function isWideChar(ch: string): boolean {
-	const cp = ch.codePointAt(0)!;
-	return (
-		(cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo 首区
-		(cp >= 0x2e80 && cp <= 0xa4cf) || // CJK 部首/笔画/统一表意/扩展A
-		(cp >= 0xac00 && cp <= 0xd7a3) || // Hangul 音节
-		(cp >= 0xf900 && cp <= 0xfaff) || // CJK 兼容表意文字
-		(cp >= 0xfe30 && cp <= 0xfe4f) || // CJK 兼容形式
-		(cp >= 0xff00 && cp <= 0xff60) || // 全角形式（含全角括号 （））
-		(cp >= 0xffe0 && cp <= 0xffe6) || // 全角符号
-		(cp >= 0x20000 && cp <= 0x3fffd) // CJK 扩展 B+
-	);
-}
-
-/**
- * 启动欢迎通知，Apple 渐变风格。
- * 圆角边框 + Apple 蓝灰配色 + 右对齐。
+ * 启动欢迎通知，三行简洁格式。
  *
- * 动态计算内容区宽度，以最长行（中文原则行）为基准，
- * 确保所有右边框对齐。
+ * 第 1 行：编辑部风题头，以细线开头、以细线结尾。
+ * 第 2 行：四条原则短名，用 / 分隔。
+ * 第 3 行：/karma 命令入口。
  */
 export function welcomeMessage(): string {
 	const title = `${BOLD}${APPLE_BLUE}Karpathy${RESET} ${APPLE_LIGHT}Coding Guidelines${RESET}`;
-	const tagline = principleShorts().join(` ${APPLE_MID}·${RESET} `);
-	const commands = `${ITALIC}${APPLE_MID}/karma  ·  /karma configure${RESET}`;
+	const tagline = principleShorts().join(" / ");
+	const commands = "/karma · /karma configure";
 
-	// 计算每行的视觉宽度（+2 是前面缩进）
-	const wTitle = displayWidth(stripAnsi(title)) + 2;
-	const wTagline = displayWidth(stripAnsi(tagline)) + 2;
-	const wCommands = displayWidth(stripAnsi(commands)) + 2;
+	// 第 1 行：题头 + 填充横线
+	const headerText = `── ${stripAnsi(title)} `;
+	const line1 = `${APPLE_GRAY}${headerText}${"─".repeat(Math.max(0, 52 - headerText.length))}${RESET}`;
 
-	// 取最大值作为内容区宽度，确保最长行也能容纳
-	const INNER = Math.max(wTitle, wTagline, wCommands);
+	// 第 2 行：四条短名
+	const line2 = `  ${tagline}`;
 
-	// 构建一行：左边框 + 内容 + 右边框
-	const contentLine = (text: string) => {
-		const visual = displayWidth(stripAnsi(text));
-		const padding = Math.max(0, INNER - visual);
-		return `  ${APPLE_GRAY}│${RESET}${text}${" ".repeat(padding)}${APPLE_GRAY}│${RESET}`;
-	};
+	// 第 3 行：命令入口
+	const line3 = `  ${APPLE_MID}${commands}${RESET}`;
 
-	// 空行：左边框 + 空格 + 右边框
-	const emptyLine = () => {
-		return `  ${APPLE_GRAY}│${RESET}${" ".repeat(INNER)}${APPLE_GRAY}│${RESET}`;
-	};
+	return [line1, line2, line3].join("\n");
+}
 
-	// 顶部/底部边框
-	const topBorder = `  ${APPLE_GRAY}╭${"".padStart(INNER, "─")}╮${RESET}`;
-	const bottomBorder = `  ${APPLE_GRAY}╰${"".padStart(INNER, "─")}╯${RESET}`;
-
-	return [
-		topBorder,
-		contentLine(`  ${title}`),
-		emptyLine(),
-		contentLine(`  ${tagline}`),
-		emptyLine(),
-		contentLine(`  ${commands}`),
-		bottomBorder,
-	].join("\n");
+/** 去掉 ANSI 转义码，得到纯文本。 */
+function stripAnsi(s: string): string {
+	return s.replace(/\x1b\[[0-9;]*m/g, "");
 }

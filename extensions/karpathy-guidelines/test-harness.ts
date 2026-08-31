@@ -82,6 +82,8 @@ export function createHarness(): Harness {
 		registerTool: (tool: { name: string }) => {
 			toolNames.add(tool.name);
 		},
+		registerMessageRenderer: () => {},
+		sendMessage: () => {},
 	} as unknown as ExtensionAPI;
 
 	function makeCtx(opts: FakeCtxOptions = {}): FakeCtx {

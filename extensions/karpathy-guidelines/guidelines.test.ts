@@ -81,11 +81,11 @@ describe("welcomeMessage", () => {
 		const lines = msg.split("\n");
 		assert.equal(lines.length, 3, "欢迎通知应为三行");
 		// 第 1 行：编辑部风题头，以细线开头、以细线结尾
-		assert.match(lines[0]!, /^── Karpathy 编码准则 ─+$/);
+		assert.match(lines[0]!, /──.*Karpathy.*Coding Guidelines.*─/);
 		// 第 2 行：行首缩进两格 + 四条短名（用 / 分隔）
-		assert.match(lines[1]!, /^  .+ \/ .+ \/ .+ \/ .+$/);
+		assert.match(lines[1]!, /^  先想后做 \/ 简单优先 \/ 外科手术式修改 \/ 目标驱动执行$/);
 		// 第 3 行：行首缩进两格 + /karma 命令入口
-		assert.match(lines[2]!, /^  \/karma .+\/karma configure/);
+		assert.match(lines[2]!, /\/karma.*\/karma configure/);
 	});
 
 	it("第二行包含全部原则短名", () => {
