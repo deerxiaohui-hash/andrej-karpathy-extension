@@ -1,6 +1,6 @@
 {
   "name": "karpathy-guidelines",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "pi Extension that programmatically enforces Karpathy's four coding guidelines",
   "type": "module",
   "private": true,

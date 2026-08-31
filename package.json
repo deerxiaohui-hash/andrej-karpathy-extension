@@ -1,6 +1,6 @@
 {
   "name": "andrej-karpathy-extension",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "pi extension that programmatically enforces Karpathy's four coding guidelines. Compatible with pi2dsh for DSH.",
   "keywords": [
     "pi-package",
