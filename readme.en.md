@@ -1,6 +1,6 @@
 # Andrej-Karpathy-Extension
 
-[简体中文](readme.md) | English
+[简体中文](https://github.com/deerxiaohui-hash/andrej-karpathy-extension/blob/main/README.md) | English
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/deerxiaohui-hash/andrej-karpathy-extension/actions/workflows/ci.yml/badge.svg)](https://github.com/deerxiaohui-hash/andrej-karpathy-extension/actions/workflows/ci.yml)
