@@ -31,7 +31,7 @@ describe("启动欢迎", () => {
 		assert.equal(w.options?.placement, "aboveEditor");
 		// 三行：题头 / 四条短名 / 命令入口
 		assert.equal(w.content.length, 3);
-		assert.match(w.content[0]!, /^── Karpathy 编码准则 ─+$/);
+		assert.match(w.content[0]!, /──.*Karpathy.*Coding Guidelines/);
 		assert.match(w.content[1]!, /先想后做.*简单优先.*外科手术式修改.*目标驱动执行/);
 		assert.match(w.content[2]!, /\/karma.*\/karma configure/);
 		// TUI 模式不应该再发 notify（避免重复）
@@ -46,17 +46,31 @@ describe("启动欢迎", () => {
 
 		assert.equal(h.widgets.length, 0, "print 模式不应调 setWidget");
 		assert.equal(h.notices.length, 1);
-		assert.match(h.notices[0]!.message, /Karpathy 编码准则/);
+		assert.match(h.notices[0]!.message, /Karpathy.*Coding Guidelines/);
+		assert.match(h.notices[0]!.message, /先想后做.*简单优先/);
 		assert.equal(h.notices[0]!.level, "info");
 	});
 
-	it("非 startup 的 session_start 不触发欢迎", async () => {
+	it("/resume 或 /new 触发的 session_start 也应设置常驻 widget", async () => {
 		const h = createHarness();
 		karpathyGuidelinesExtension(h.pi);
 
 		await h.fire("session_start", { type: "session_start", reason: "resume" }, { mode: "tui" });
 
-		assert.equal(h.widgets.length, 0);
+		assert.equal(h.widgets.length, 1, "resume 原因下应调用一次 setWidget");
+		assert.equal(h.widgets[0]!.key, "karpathy-welcome");
+		assert.equal(h.widgets[0]!.options?.placement, "aboveEditor");
+		assert.equal(h.notices.length, 0, "TUI 模式下不应发 notify");
+	});
+
+	it("/new 触发的 session_start 也应设置常驻 widget", async () => {
+		const h = createHarness();
+		karpathyGuidelinesExtension(h.pi);
+
+		await h.fire("session_start", { type: "session_start", reason: "new" }, { mode: "tui" });
+
+		assert.equal(h.widgets.length, 1, "new 原因下应调用一次 setWidget");
+		assert.equal(h.widgets[0]!.key, "karpathy-welcome");
 		assert.equal(h.notices.length, 0);
 	});
 

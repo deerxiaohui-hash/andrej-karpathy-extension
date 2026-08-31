@@ -25,6 +25,7 @@ import { registerToolGuard } from "./tool-guard.js";
 import { registerResultWatcher } from "./result-watcher.js";
 import { registerCommands } from "./commands.js";
 import { registerSelfCheckTool } from "./self-check-tool.js";
+import { registerUpdateChecker } from "./update-checker.js";
 import { welcomeMessage } from "./guidelines.js";
 
 /** 常驻 widget 的 key。同一 key 重复 setWidget 会先移除旧组件再设置新的。 */
@@ -51,12 +52,14 @@ export default function karpathyGuidelinesExtension(pi: ExtensionAPI) {
 	// 5. 注册 self_check 工具。
 	registerSelfCheckTool(pi);
 
+	// 6. 检查 npm 版本更新。
+	registerUpdateChecker(pi);
+
 	// 常驻欢迎 widget。TUI 模式下把三行编辑部风欢迎语固定在输入框上方，
 	// 整个 session 期间可见；print/RPC 模式没有 widget，退回一次性 notify。
 	// "startup" 在每个进程里只触发一次；同 key 重复 setWidget 幂等，
 	// /reload 后重新注册也只会得到一个 widget。
-	pi.on("session_start", async (event, ctx) => {
-		if (event.reason !== "startup") return;
+	pi.on("session_start", async (_event, ctx) => {
 		if (ctx.mode === "tui") {
 			ctx.ui.setWidget(WIDGET_KEY, welcomeMessage().split("\n"), {
 				placement: "aboveEditor",
